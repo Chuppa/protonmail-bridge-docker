@@ -14,6 +14,9 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     make \
     gcc \
     libsecret-1-dev \
+    libglib2.0-dev \
+    libgpgme-dev \
+    libgpg-error-dev \
     libfido2-dev \
     libcbor-dev \
     libssl-dev \
@@ -38,10 +41,11 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     ca-certificates \
     dumb-init \
     libsecret-1-0 \
-    pass \
-    gnupg \
+    libglib2.0-0 \
+    libgpgme11 \
+    libgpg-error0 \
     libfido2-1 \
-    libcbor0 \
+    libcbor0.8 \
     libssl3 \
     && rm -rf /var/lib/apt/lists/*
 
