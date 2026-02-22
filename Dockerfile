@@ -1,8 +1,5 @@
 # syntax=docker/dockerfile:1
 
-############################
-# Build (ARM64 only)
-############################
 FROM --platform=linux/arm64 golang:1.25-bookworm AS builder
 
 ARG BRIDGE_VERSION
@@ -20,12 +17,8 @@ RUN git clone https://github.com/ProtonMail/proton-bridge.git . \
 
 ENV CGO_ENABLED=1 GOARCH=arm64
 
-# Build the correct ARM64-compatible entrypoint
-RUN go build -o /tmp/proton-bridge ./cmd/bridge
+RUN go build -o /tmp/proton-bridge ./cmd/cli
 
-############################
-# Runtime (ARM64 only)
-############################
 FROM --platform=linux/arm64 debian:bookworm-slim
 
 RUN apt-get update && apt-get install -y --no-install-recommends \
@@ -35,10 +28,6 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     && rm -rf /var/lib/apt/lists/*
 
 COPY --from=builder /tmp/proton-bridge /usr/local/bin/proton-bridge
-
-WORKDIR /app
-
-EXPOSE 25 143
 
 ENTRYPOINT ["dumb-init", "--"]
 CMD ["proton-bridge"]
