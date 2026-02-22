@@ -1,0 +1,47 @@
+name: Test ProtonMail Bridge resolver
+
+on:
+  workflow_dispatch:
+
+jobs:
+  resolve-only:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Resolve latest ARM64-compatible ProtonMail Bridge version
+        id: resolve
+        run: |
+          set -euo pipefail
+          sudo apt-get update
+          sudo apt-get install -y jq curl
+
+          echo "Fetching releases from GitHub API..."
+          releases_json=$(curl -sSL https://api.github.com/repos/ProtonMail/proton-bridge/releases)
+
+          echo "All non-prerelease, non-draft tags (first 50):"
+          echo "$releases_json" \
+            | jq -r '.[] | select(.prerelease == false and .draft == false) | .tag_name' \
+            | head -n50
+
+          echo "Filtering tags matching v3.23+..."
+          matched=$(
+            echo "$releases_json" \
+            | jq -r '.[] | select(.prerelease == false and .draft == false) | .tag_name' \
+            | grep -E '^v3\.(2[3-9]|[3-9][0-9])\.' || true
+          )
+
+          echo "Matched tags (if any):"
+          echo "$matched" || true
+
+          resolved=$(printf '%s\n' "$matched" | head -n1 || true)
+
+          if [ -z "${resolved:-}" ]; then
+            echo "::warning::No matching v3.23+ tag found; falling back to v3.23.0"
+            resolved="v3.23.0"
+          fi
+
+          echo "Resolved tag: $resolved"
+          echo "bridge_version=${resolved#v}" >> "$GITHUB_OUTPUT"
+
+      - name: Show resolved output
+        run: |
+          echo "bridge_version from output: ${{ steps.resolve.outputs.bridge_version }}"
