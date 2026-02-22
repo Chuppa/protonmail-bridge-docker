@@ -1,36 +1,49 @@
 # syntax=docker/dockerfile:1
 
-ARG DEBIAN_VERSION=bookworm-slim
-FROM debian:${DEBIAN_VERSION}
+############################
+# 1. Build Proton Bridge
+############################
+FROM golang:1.22-bookworm AS builder
 
-ARG TARGETARCH
 ARG BRIDGE_VERSION
+ARG TARGETARCH
 
-ENV DEBIAN_FRONTEND=noninteractive
+# Install build dependencies
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    git \
+    make \
+    gcc \
+    libsecret-1-dev \
+    && rm -rf /var/lib/apt/lists/*
+
+WORKDIR /src
+
+# Clone Proton Bridge source at the correct version
+RUN git clone https://github.com/ProtonMail/proton-bridge.git . \
+    && git checkout "v${BRIDGE_VERSION}"
+
+# Build for the correct architecture
+RUN GOARCH=${TARGETARCH} make build-nogui
+
+############################
+# 2. Runtime Image
+############################
+FROM debian:bookworm-slim
 
 RUN apt-get update && apt-get install -y --no-install-recommends \
     ca-certificates \
-    wget \
     dumb-init \
     libsecret-1-0 \
     pass \
     gnupg \
     && rm -rf /var/lib/apt/lists/*
 
-WORKDIR /opt
+WORKDIR /app
 
-# Download tar.gz from GitHub Releases
-RUN wget -O bridge.tar.gz \
-      "https://github.com/ProtonMail/proton-bridge/releases/download/v${BRIDGE_VERSION}/protonmail-bridge-${BRIDGE_VERSION}.tar.gz" \
-    && tar -xzf bridge.tar.gz \
-    && rm bridge.tar.gz
-
-# The extracted folder contains the binary
-RUN install -m 755 protonmail-bridge*/protonmail-bridge /usr/local/bin/protonmail-bridge
-
-WORKDIR /root
+# Copy built binary
+COPY --from=builder /src/build/proton-bridge /usr/local/bin/proton-bridge
 
 EXPOSE 25 143
 
 ENTRYPOINT ["dumb-init", "--"]
-CMD ["protonmail-bridge"]
+CMD ["proton-bridge"]
