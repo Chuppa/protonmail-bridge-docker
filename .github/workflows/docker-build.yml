@@ -1,4 +1,4 @@
-name: Build and publish Docker image (multi-arch, latest Bridge)
+name: Build and publish Docker image (multi-arch, stable only)
 
 on:
   push:
@@ -6,7 +6,7 @@ on:
   workflow_dispatch:
 
 jobs:
-  resolve-and-build:
+  build:
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -15,18 +15,41 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Resolve latest ProtonMail Bridge version
+      # Extract latest *stable* release version from GitHub Releases
+      - name: Resolve latest stable ProtonMail Bridge version
         id: resolve
         run: |
           set -euo pipefail
-          json=$(curl -sSL https://proton.me/api/bridge/updates)
-          ver=$(echo "$json" | grep -Eo '"Version": *"[^"]+"' | sed 's/"Version": *"//;s/"//')
-          if [ -z "$ver" ]; then
-            echo "Failed to parse version from Proton API" >&2
+
+          # Fetch the releases HTML
+          page=$(curl -sSL https://github.com/ProtonMail/proton-bridge/releases)
+
+          # Remove prerelease sections entirely
+          stable=$(echo "$page" | awk '
+            /<div class="Box">/ { in_block=1 }
+            /Pre-release/ { in_block=0 }
+            in_block
+          ')
+
+          # Extract first stable amd64 .deb filename
+          filename=$(echo "$stable" | grep -Eo 'protonmail-bridge_[0-9]+\.[0-9]+\.[0-9]+-1_amd64\.deb' | head -n1)
+
+          if [ -z "$filename" ]; then
+            echo "Failed to find stable .deb filename on GitHub releases page" >&2
             exit 1
           fi
+
+          # Extract version number
+          ver=$(echo "$filename" | sed -E 's/protonmail-bridge_([0-9]+\.[0-9]+\.[0-9]+)-1_.*/\1/')
+
+          if [ -z "$ver" ]; then
+            echo "Failed to parse version from filename: $filename" >&2
+            exit 1
+          fi
+
           echo "bridge_version=$ver" >> "$GITHUB_OUTPUT"
 
+      # Lowercase GHCR repo name
       - name: Compute lowercase repository name
         id: repo
         run: |
@@ -41,11 +64,13 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      - uses: docker/build-push-action@v6
+      - name: Build and push multi-arch image
+        uses: docker/build-push-action@v6
         with:
           context: .
           platforms: linux/amd64,linux/arm64
           push: true
-          tags: ghcr.io/${{ steps.repo.outputs.repo }}:latest
+          tags: |
+            ghcr.io/${{ steps.repo.outputs.repo }}:latest
           build-args: |
             BRIDGE_VERSION=${{ steps.resolve.outputs.bridge_version }}

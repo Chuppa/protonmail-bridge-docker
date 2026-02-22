@@ -11,7 +11,6 @@ ENV DEBIAN_FRONTEND=noninteractive
 RUN apt-get update && apt-get install -y --no-install-recommends \
     ca-certificates \
     wget \
-    curl \
     dumb-init \
     libsecret-1-0 \
     pass \
@@ -20,8 +19,10 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 
 WORKDIR /tmp
 
+# GitHub Releases naming pattern:
+# protonmail-bridge_<VERSION>-1_<ARCH>.deb
 RUN wget -O bridge.deb \
-      "https://proton.me/download/bridge/protonmail-bridge_${BRIDGE_VERSION}_linux_${TARGETARCH}.deb" \
+      "https://github.com/ProtonMail/proton-bridge/releases/download/v${BRIDGE_VERSION}/protonmail-bridge_${BRIDGE_VERSION}-1_${TARGETARCH}.deb" \
     && apt-get update \
     && apt-get install -y ./bridge.deb \
     && rm -f bridge.deb \
@@ -29,6 +30,7 @@ RUN wget -O bridge.deb \
 
 WORKDIR /root
 
+# SMTP + IMAP
 EXPOSE 25 143
 
 ENTRYPOINT ["dumb-init", "--"]
