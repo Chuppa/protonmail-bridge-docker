@@ -20,8 +20,8 @@ RUN git clone https://github.com/ProtonMail/proton-bridge.git . \
 
 ENV CGO_ENABLED=1 GOARCH=arm64
 
-# ARM64 requires CLI build
-RUN make build-cli && cp build/proton-bridge /tmp/proton-bridge
+# Build CLI directly (Makefile does NOT support ARM64)
+RUN go build -o /tmp/proton-bridge ./cmd/cli
 
 ############################
 # Runtime (ARM64 only)
