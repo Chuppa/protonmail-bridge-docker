@@ -19,10 +19,10 @@ jobs:
         id: resolve
         run: |
           set -euo pipefail
-          json=$(curl -sSL https://proton.me/download/bridge/updates.json)
+          json=$(curl -sSL https://proton.me/api/bridge/updates)
           ver=$(echo "$json" | grep -Eo '"Version": *"[^"]+"' | sed 's/"Version": *"//;s/"//')
           if [ -z "$ver" ]; then
-            echo "Failed to parse version from updates.json" >&2
+            echo "Failed to parse version from Proton API" >&2
             exit 1
           fi
           echo "bridge_version=$ver" >> "$GITHUB_OUTPUT"
