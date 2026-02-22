@@ -17,20 +17,19 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     gnupg \
     && rm -rf /var/lib/apt/lists/*
 
-WORKDIR /tmp
+WORKDIR /opt
 
-# GitHub Releases naming pattern:
-# protonmail-bridge_<VERSION>-1_<ARCH>.deb
-RUN wget -O bridge.deb \
-      "https://github.com/ProtonMail/proton-bridge/releases/download/v${BRIDGE_VERSION}/protonmail-bridge_${BRIDGE_VERSION}-1_${TARGETARCH}.deb" \
-    && apt-get update \
-    && apt-get install -y ./bridge.deb \
-    && rm -f bridge.deb \
-    && rm -rf /var/lib/apt/lists/*
+# Download tar.gz from GitHub Releases
+RUN wget -O bridge.tar.gz \
+      "https://github.com/ProtonMail/proton-bridge/releases/download/v${BRIDGE_VERSION}/protonmail-bridge-${BRIDGE_VERSION}.tar.gz" \
+    && tar -xzf bridge.tar.gz \
+    && rm bridge.tar.gz
+
+# The extracted folder contains the binary
+RUN install -m 755 protonmail-bridge*/protonmail-bridge /usr/local/bin/protonmail-bridge
 
 WORKDIR /root
 
-# SMTP + IMAP
 EXPOSE 25 143
 
 ENTRYPOINT ["dumb-init", "--"]
