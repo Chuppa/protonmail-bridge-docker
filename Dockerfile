@@ -1,25 +1,35 @@
 # syntax=docker/dockerfile:1
 
-FROM --platform=linux/arm64 golang:1.25-bookworm AS builder
+############################
+# Build stage
+############################
+FROM golang:1.25-bookworm AS builder
 
-ARG BRIDGE_VERSION
+ARG BRIDGE_VERSION=3.23.0
 
 RUN apt-get update && apt-get install -y --no-install-recommends \
-    git make gcc \
+    git gcc ca-certificates \
     libsecret-1-dev libglib2.0-dev libgpgme-dev libgpg-error-dev \
     libfido2-dev libcbor-dev libssl-dev \
     && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /src
 
-RUN git clone https://github.com/ProtonMail/proton-bridge.git . \
-    && git checkout "v${BRIDGE_VERSION}"
+# Clone the repo and checkout the requested tag
+RUN git clone --depth 1 https://github.com/ProtonMail/proton-bridge.git . \
+    && git fetch --tags --depth=1 origin "v${BRIDGE_VERSION}" || true \
+    && git checkout "v${BRIDGE_VERSION}" || true
 
-ENV CGO_ENABLED=1 GOARCH=arm64
+ENV CGO_ENABLED=1 GOOS=linux GOARCH=arm64
 
-RUN go build -o /tmp/proton-bridge ./cmd/cli
+# Ensure modules are downloaded and build the CLI entrypoint (exists in v3.23.0+)
+RUN go mod download
+RUN go build -ldflags="-s -w" -o /tmp/proton-bridge ./cmd/cli
 
-FROM --platform=linux/arm64 debian:bookworm-slim
+############################
+# Runtime stage
+############################
+FROM debian:bookworm-slim
 
 RUN apt-get update && apt-get install -y --no-install-recommends \
     ca-certificates dumb-init \
@@ -28,6 +38,10 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     && rm -rf /var/lib/apt/lists/*
 
 COPY --from=builder /tmp/proton-bridge /usr/local/bin/proton-bridge
+
+WORKDIR /app
+
+EXPOSE 25 143
 
 ENTRYPOINT ["dumb-init", "--"]
 CMD ["proton-bridge"]
