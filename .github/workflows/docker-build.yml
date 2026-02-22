@@ -41,6 +41,12 @@ jobs:
             exit 1
           fi
 
+      - name: Compute lowercase repository name
+        id: repo
+        run: |
+          # Lowercase the owner/repo string and expose as output 'repo'
+          echo "repo=$(echo \"$GITHUB_REPOSITORY\" | tr '[:upper:]' '[:lower:]')" >> "$GITHUB_OUTPUT"
+
       - name: Set up QEMU
         uses: docker/setup-qemu-action@v3
 
@@ -61,6 +67,6 @@ jobs:
           platforms: linux/amd64,linux/arm64
           push: true
           tags: |
-            ghcr.io/${{ toLower(github.repository) }}:latest
+            ghcr.io/${{ steps.repo.outputs.repo }}:latest
           build-args: |
             BRIDGE_VERSION=${{ steps.resolve.outputs.bridge_version }}
