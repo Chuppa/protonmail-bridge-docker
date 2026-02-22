@@ -15,13 +15,13 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Resolve latest stable ProtonMail Bridge version
+      # Force v3.23.0+ because earlier versions have no ARM64 CLI
+      - name: Resolve latest ARM64‑compatible ProtonMail Bridge version
         id: resolve
         run: |
           set -euo pipefail
-          json=$(curl -sSL https://api.github.com/repos/ProtonMail/proton-bridge/releases/latest)
-          filename=$(echo "$json" | grep -Eo 'protonmail-bridge_[0-9]+\.[0-9]+\.[0-9]+-1_amd64\.deb' | head -n1)
-          ver=$(echo "$filename" | sed -E 's/protonmail-bridge_([0-9]+\.[0-9]+\.[0-9]+)-1_.*/\1/')
+          json=$(curl -sSL https://api.github.com/repos/ProtonMail/proton-bridge/releases)
+          ver=$(echo "$json" | jq -r '.[].tag_name' | grep -E '^v3\.2[3-9]\.' | head -n1 | sed 's/v//')
           echo "bridge_version=$ver" >> "$GITHUB_OUTPUT"
 
       - name: Lowercase repo
