@@ -13,60 +13,39 @@ jobs:
       packages: write
 
     steps:
-      - name: Checkout
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
 
       - name: Resolve latest ProtonMail Bridge version
         id: resolve
         run: |
           set -euo pipefail
-          TARGETARCH=amd64
-          candidate="https://proton.me/download/bridge/protonmail-bridge_latest_linux_${TARGETARCH}.deb"
-          final_url=$(curl -sSL -I -o /dev/null -w '%{url_effective}' "$candidate" || true)
-          if [ -z "$final_url" ] || [[ "$final_url" == "$candidate" ]]; then
-            page=$(curl -sSL "https://proton.me/download/bridge")
-            final_url=$(echo "$page" | grep -Eo 'https?://[^"]+protonmail-bridge_[0-9]+\.[0-9]+(\.[0-9]+)?_linux_[^"]+\.deb' | head -n1 || true)
-          fi
-          if [ -z "$final_url" ]; then
-            echo "Could not resolve latest ProtonMail Bridge download URL." >&2
+          json=$(curl -sSL https://proton.me/download/bridge/updates.json)
+          ver=$(echo "$json" | grep -Eo '"Version": *"[^"]+"' | sed 's/"Version": *"//;s/"//')
+          if [ -z "$ver" ]; then
+            echo "Failed to parse version from updates.json" >&2
             exit 1
           fi
-          echo "final_url=$final_url" >> "$GITHUB_OUTPUT"
-          filename=$(basename "$final_url")
-          if [[ "$filename" =~ protonmail-bridge_([0-9]+\.[0-9]+(\.[0-9]+)?)_linux_ ]]; then
-            ver="${BASH_REMATCH[1]}"
-            echo "bridge_version=$ver" >> "$GITHUB_OUTPUT"
-          else
-            echo "Could not parse version from filename: $filename" >&2
-            exit 1
-          fi
+          echo "bridge_version=$ver" >> "$GITHUB_OUTPUT"
 
       - name: Compute lowercase repository name
         id: repo
         run: |
-          # Lowercase the owner/repo string and expose as output 'repo'
           echo "repo=$(echo \"$GITHUB_REPOSITORY\" | tr '[:upper:]' '[:lower:]')" >> "$GITHUB_OUTPUT"
 
-      - name: Set up QEMU
-        uses: docker/setup-qemu-action@v3
+      - uses: docker/setup-qemu-action@v3
+      - uses: docker/setup-buildx-action@v3
 
-      - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v3
-
-      - name: Login to GitHub Container Registry
-        uses: docker/login-action@v3
+      - uses: docker/login-action@v3
         with:
           registry: ghcr.io
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Build and push multi-arch image
-        uses: docker/build-push-action@v6
+      - uses: docker/build-push-action@v6
         with:
           context: .
           platforms: linux/amd64,linux/arm64
           push: true
-          tags: |
-            ghcr.io/${{ steps.repo.outputs.repo }}:latest
+          tags: ghcr.io/${{ steps.repo.outputs.repo }}:latest
           build-args: |
             BRIDGE_VERSION=${{ steps.resolve.outputs.bridge_version }}
