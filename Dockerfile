@@ -3,7 +3,7 @@
 ############################
 # 1. Build Proton Bridge
 ############################
-FROM golang:1.22-bookworm AS builder
+FROM golang:1.25-bookworm AS builder
 
 ARG BRIDGE_VERSION
 ARG TARGETARCH
@@ -14,6 +14,9 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     make \
     gcc \
     libsecret-1-dev \
+    libfido2-dev \
+    libcbor-dev \
+    libssl-dev \
     && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /src
@@ -23,6 +26,7 @@ RUN git clone https://github.com/ProtonMail/proton-bridge.git . \
     && git checkout "v${BRIDGE_VERSION}"
 
 # Build for the correct architecture
+ENV CGO_ENABLED=1
 RUN GOARCH=${TARGETARCH} make build-nogui
 
 ############################
@@ -36,6 +40,9 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     libsecret-1-0 \
     pass \
     gnupg \
+    libfido2-1 \
+    libcbor0 \
+    libssl3 \
     && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app
