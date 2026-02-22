@@ -5,7 +5,7 @@
 ############################
 FROM golang:1.25-bookworm AS builder
 
-ARG BRIDGE_VERSION=3.23.0
+ARG BRIDGE_VERSION=3.22.0
 
 RUN apt-get update && apt-get install -y --no-install-recommends \
     git gcc ca-certificates \
@@ -15,10 +15,13 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 
 WORKDIR /src
 
-# Clone the repo and checkout the requested tag
-RUN git clone --depth 1 https://github.com/ProtonMail/proton-bridge.git . \
-    && git fetch --tags --depth=1 origin "v${BRIDGE_VERSION}" || true \
-    && git checkout "v${BRIDGE_VERSION}" || true
+# Clone the repo and ensure the requested tag exists; fail fast if not present
+RUN git clone https://github.com/ProtonMail/proton-bridge.git . \
+ && if git rev-parse --verify "refs/tags/v${BRIDGE_VERSION}" >/dev/null 2>&1; then \
+      git checkout "v${BRIDGE_VERSION}"; \
+    else \
+      echo "Tag v${BRIDGE_VERSION} not found; aborting build" >&2; exit 1; \
+    fi
 
 ENV CGO_ENABLED=1 GOOS=linux GOARCH=arm64
 

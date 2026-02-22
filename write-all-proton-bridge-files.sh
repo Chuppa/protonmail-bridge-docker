@@ -23,7 +23,7 @@ cat > "$DOCKERFILE_PATH" <<'DOCKERFILE'
 ############################
 FROM golang:1.25-bookworm AS builder
 
-ARG BRIDGE_VERSION=3.23.0
+ARG BRIDGE_VERSION=3.22.0
 
 RUN apt-get update && apt-get install -y --no-install-recommends \
     git gcc ca-certificates \
@@ -33,10 +33,13 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 
 WORKDIR /src
 
-# Clone the repo and checkout the requested tag
-RUN git clone --depth 1 https://github.com/ProtonMail/proton-bridge.git . \
-    && git fetch --tags --depth=1 origin "v${BRIDGE_VERSION}" || true \
-    && git checkout "v${BRIDGE_VERSION}" || true
+# Clone the repo and ensure the requested tag exists; fail fast if not present
+RUN git clone https://github.com/ProtonMail/proton-bridge.git . \
+ && if git rev-parse --verify "refs/tags/v${BRIDGE_VERSION}" >/dev/null 2>&1; then \
+      git checkout "v${BRIDGE_VERSION}"; \
+    else \
+      echo "Tag v${BRIDGE_VERSION} not found; aborting build" >&2; exit 1; \
+    fi
 
 ENV CGO_ENABLED=1 GOOS=linux GOARCH=arm64
 
@@ -84,26 +87,6 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Resolve latest ARM64-compatible ProtonMail Bridge version
-        id: resolve
-        run: |
-          set -euo pipefail
-          sudo apt-get update
-          sudo apt-get install -y jq curl
-
-          resolved=$(
-            curl -sSL https://api.github.com/repos/ProtonMail/proton-bridge/releases \
-            | jq -r '.[] | select(.prerelease == false and .draft == false) | .tag_name' \
-            | grep -E '^v3\.(2[3-9]|[3-9][0-9])\.' \
-            | head -n1
-          )
-
-          if [ -z "${resolved:-}" ]; then
-            resolved="v3.23.0"
-          fi
-
-          echo "bridge_version=${resolved#v}" >> "$GITHUB_OUTPUT"
-
       - name: Lowercase repo
         id: repo
         run: echo "repo=$(echo "$GITHUB_REPOSITORY" | tr '[:upper:]' '[:lower:]')" >> "$GITHUB_OUTPUT"
@@ -117,19 +100,18 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Build and push ARM64 image
+      - name: Build and push ARM64 image (pinned to 3.22.0)
         uses: docker/build-push-action@v6
         with:
           context: .
           platforms: linux/arm64
           push: true
-          tags: ghcr.io/${{ steps.repo.outputs.repo }}:latest
+          tags: ghcr.io/${{ steps.repo.outputs.repo }}:3.22.0
           build-args: |
-            BRIDGE_VERSION=${{ steps.resolve.outputs.bridge_version }}
+            BRIDGE_VERSION=3.22.0
 YML
 
 cat > "$DOCKERIGNORE_PATH" <<'DOCKERIGNORE'
-# Ignore local files
 .git
 .gitignore
 .github
@@ -141,8 +123,6 @@ tmp
 *.tmp
 .DS_Store
 .env
-Dockerfile*
-docker-compose*.yml
 DOCKERIGNORE
 
 cat > "$GITIGNORE_PATH" <<'GITIGNORE'
@@ -167,19 +147,20 @@ GITIGNORE
 cat > "$README_PATH" <<'README'
 # ProtonMail Bridge (ARM64 Docker build)
 
-This repository contains a Dockerfile and GitHub Actions workflow to build an ARM64 headless ProtonMail Bridge binary from source (uses `cmd/cli` available in v3.23.0+).
+This repository contains a Dockerfile and GitHub Actions workflow to build an ARM64 headless ProtonMail Bridge binary from source (builds `./cmd/cli`).
+
+This setup is pinned to **v3.22.0** to match available releases.
 
 ## Files created
 - `Dockerfile` — multi-stage build (builds `./cmd/cli` for ARM64).
-- `.github/workflows/docker-build.yml` — CI that resolves a suitable ProtonMail Bridge tag (v3.23.0+), builds and pushes an ARM64 image to GHCR.
+- `.github/workflows/docker-build.yml` — CI that builds and pushes an ARM64 image to GHCR.
 - `.dockerignore`, `.gitignore`
 - `docker-compose.yml` — local compose for testing.
 - `entrypoint.sh` — runtime entrypoint wrapper.
 - `.env.example` — example environment variables.
 - `LICENSE` — MIT license.
 
-## Local test (optional)
+## Local test
 1. Build locally (requires buildx/qemu for ARM emulation):
    ```bash
-   docker buildx build --platform linux/arm64 -t proton-bridge:local --load --build-arg BRIDGE_VERSION=3.23.0 .
-
+   docker buildx build --platform linux/arm64 -t proton-bridge:local --load --build-arg BRIDGE_VERSION=3.22.0 .

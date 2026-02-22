@@ -1,5 +1,11 @@
 .git
 .gitignore
+.github
 node_modules
+vendor
+bin
+tmp
+*.log
+*.tmp
 .DS_Store
 .env
