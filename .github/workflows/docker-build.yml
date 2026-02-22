@@ -15,16 +15,13 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      # Extract latest stable release version from GitHub API
       - name: Resolve latest stable ProtonMail Bridge version
         id: resolve
         run: |
           set -euo pipefail
 
-          # Fetch latest stable release JSON
           json=$(curl -sSL https://api.github.com/repos/ProtonMail/proton-bridge/releases/latest)
 
-          # Extract the .deb filename for amd64
           filename=$(echo "$json" \
             | grep -Eo 'protonmail-bridge_[0-9]+\.[0-9]+\.[0-9]+-1_amd64\.deb' \
             | head -n1)
@@ -34,7 +31,6 @@ jobs:
             exit 1
           fi
 
-          # Extract version number (e.g., 3.22.1)
           ver=$(echo "$filename" | sed -E 's/protonmail-bridge_([0-9]+\.[0-9]+\.[0-9]+)-1_.*/\1/')
 
           if [ -z "$ver" ]; then
@@ -44,11 +40,10 @@ jobs:
 
           echo "bridge_version=$ver" >> "$GITHUB_OUTPUT"
 
-      # Lowercase GHCR repo name
       - name: Compute lowercase repository name
         id: repo
         run: |
-          echo "repo=$(echo \"$GITHUB_REPOSITORY\" | tr '[:upper:]' '[:lower:]')" >> "$GITHUB_OUTPUT"
+          echo "repo=$(echo "$GITHUB_REPOSITORY" | tr '[:upper:]' '[:lower:]')" >> "$GITHUB_OUTPUT"
 
       - uses: docker/setup-qemu-action@v3
       - uses: docker/setup-buildx-action@v3
@@ -65,7 +60,6 @@ jobs:
           context: .
           platforms: linux/amd64,linux/arm64
           push: true
-          tags: |
-            ghcr.io/${{ steps.repo.outputs.repo }}:latest
+          tags: ghcr.io/${{ steps.repo.outputs.repo }}:latest
           build-args: |
             BRIDGE_VERSION=${{ steps.resolve.outputs.bridge_version }}
