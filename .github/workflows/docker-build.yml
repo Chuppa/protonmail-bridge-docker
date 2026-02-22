@@ -22,17 +22,32 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y jq curl
 
-          resolved=$(
-            curl -sSL https://api.github.com/repos/ProtonMail/proton-bridge/releases \
+          echo "Fetching releases from GitHub API..."
+          releases_json=$(curl -sSL https://api.github.com/repos/ProtonMail/proton-bridge/releases)
+
+          echo "All non-prerelease, non-draft tags (first 50):"
+          echo "$releases_json" \
             | jq -r '.[] | select(.prerelease == false and .draft == false) | .tag_name' \
-            | grep -E '^v3\.(2[3-9]|[3-9][0-9])\.' \
-            | head -n1
+            | head -n50
+
+          echo "Filtering tags matching v3.23+..."
+          matched=$(
+            echo "$releases_json" \
+            | jq -r '.[] | select(.prerelease == false and .draft == false) | .tag_name' \
+            | grep -E '^v3\.(2[3-9]|[3-9][0-9])\.' || true
           )
 
+          echo "Matched tags (if any):"
+          echo "$matched" || true
+
+          resolved=$(printf '%s\n' "$matched" | head -n1 || true)
+
           if [ -z "${resolved:-}" ]; then
+            echo "::warning::No matching v3.23+ tag found; falling back to v3.23.0"
             resolved="v3.23.0"
           fi
 
+          echo "Resolved tag: $resolved"
           echo "bridge_version=${resolved#v}" >> "$GITHUB_OUTPUT"
 
       - name: Lowercase repo
