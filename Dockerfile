@@ -1,12 +1,11 @@
 # syntax=docker/dockerfile:1
 
 ############################
-# 1. Build Proton Bridge
+# Build (ARM64 only)
 ############################
-FROM golang:1.25-bookworm AS builder
+FROM --platform=linux/arm64 golang:1.25-bookworm AS builder
 
 ARG BRIDGE_VERSION
-ARG TARGETARCH
 
 RUN apt-get update && apt-get install -y --no-install-recommends \
     git make gcc \
@@ -19,19 +18,15 @@ WORKDIR /src
 RUN git clone https://github.com/ProtonMail/proton-bridge.git . \
     && git checkout "v${BRIDGE_VERSION}"
 
-ENV CGO_ENABLED=1
+ENV CGO_ENABLED=1 GOARCH=arm64
 
-# Build correct binary per architecture
-RUN if [ "$TARGETARCH" = "amd64" ]; then \
-        GOARCH=amd64 make build-nogui && cp build/proton-bridge /tmp/proton-bridge ; \
-    else \
-        GOARCH=arm64 make build-cli && cp build/proton-bridge /tmp/proton-bridge ; \
-    fi
+# ARM64 requires CLI build
+RUN make build-cli && cp build/proton-bridge /tmp/proton-bridge
 
 ############################
-# 2. Runtime Image
+# Runtime (ARM64 only)
 ############################
-FROM debian:bookworm-slim
+FROM --platform=linux/arm64 debian:bookworm-slim
 
 RUN apt-get update && apt-get install -y --no-install-recommends \
     ca-certificates dumb-init \

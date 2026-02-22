@@ -1,4 +1,4 @@
-name: Build and publish Docker image (multi-arch, stable only)
+name: Build and publish ARM64 ProtonMail Bridge
 
 on:
   push:
@@ -19,31 +19,14 @@ jobs:
         id: resolve
         run: |
           set -euo pipefail
-
           json=$(curl -sSL https://api.github.com/repos/ProtonMail/proton-bridge/releases/latest)
-
-          filename=$(echo "$json" \
-            | grep -Eo 'protonmail-bridge_[0-9]+\.[0-9]+\.[0-9]+-1_amd64\.deb' \
-            | head -n1)
-
-          if [ -z "$filename" ]; then
-            echo "Failed to find stable .deb filename in GitHub API response" >&2
-            exit 1
-          fi
-
+          filename=$(echo "$json" | grep -Eo 'protonmail-bridge_[0-9]+\.[0-9]+\.[0-9]+-1_amd64\.deb' | head -n1)
           ver=$(echo "$filename" | sed -E 's/protonmail-bridge_([0-9]+\.[0-9]+\.[0-9]+)-1_.*/\1/')
-
-          if [ -z "$ver" ]; then
-            echo "Failed to parse version from filename: $filename" >&2
-            exit 1
-          fi
-
           echo "bridge_version=$ver" >> "$GITHUB_OUTPUT"
 
-      - name: Compute lowercase repository name
+      - name: Lowercase repo
         id: repo
-        run: |
-          echo "repo=$(echo "$GITHUB_REPOSITORY" | tr '[:upper:]' '[:lower:]')" >> "$GITHUB_OUTPUT"
+        run: echo "repo=$(echo "$GITHUB_REPOSITORY" | tr '[:upper:]' '[:lower:]')" >> "$GITHUB_OUTPUT"
 
       - uses: docker/setup-qemu-action@v3
       - uses: docker/setup-buildx-action@v3
@@ -54,11 +37,11 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Build and push multi-arch image
+      - name: Build and push ARM64 image
         uses: docker/build-push-action@v6
         with:
           context: .
-          platforms: linux/amd64,linux/arm64
+          platforms: linux/arm64
           push: true
           tags: ghcr.io/${{ steps.repo.outputs.repo }}:latest
           build-args: |
