@@ -21,8 +21,16 @@ jobs:
           set -euo pipefail
           sudo apt-get update
           sudo apt-get install -y jq
-          json=$(curl -sSL https://api.github.com/repos/ProtonMail/proton-bridge/releases)
-          ver=$(echo "$json" | jq -r '.[].tag_name' | grep -E '^v3\.2[3-9]\.' | head -n1 | sed 's/v//')
+
+          # Fetch releases, filter out prereleases/drafts, match v3.23.0+
+          ver=$(
+            curl -sSL https://api.github.com/repos/ProtonMail/proton-bridge/releases \
+            | jq -r '.[] | select(.prerelease == false and .draft == false) | .tag_name' \
+            | grep -E '^v3\.2[3-9]\.' \
+            | head -n1 \
+            | sed 's/^v//'
+          )
+
           echo "bridge_version=$ver" >> "$GITHUB_OUTPUT"
 
       - name: Lowercase repo
