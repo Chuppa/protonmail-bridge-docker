@@ -15,31 +15,29 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      # Extract latest *stable* release version from GitHub Releases
+      # Extract latest stable release version from GitHub Releases
       - name: Resolve latest stable ProtonMail Bridge version
         id: resolve
         run: |
           set -euo pipefail
 
-          # Fetch the releases HTML
+          # Fetch releases HTML
           page=$(curl -sSL https://github.com/ProtonMail/proton-bridge/releases)
 
           # Remove prerelease sections entirely
-          stable=$(echo "$page" | awk '
-            /<div class="Box">/ { in_block=1 }
-            /Pre-release/ { in_block=0 }
-            in_block
-          ')
+          stable=$(echo "$page" | sed '/Pre-release/,+200d')
 
           # Extract first stable amd64 .deb filename
-          filename=$(echo "$stable" | grep -Eo 'protonmail-bridge_[0-9]+\.[0-9]+\.[0-9]+-1_amd64\.deb' | head -n1)
+          filename=$(echo "$stable" \
+            | grep -Eo 'protonmail-bridge_[0-9]+\.[0-9]+\.[0-9]+-1_amd64\.deb' \
+            | head -n1)
 
           if [ -z "$filename" ]; then
             echo "Failed to find stable .deb filename on GitHub releases page" >&2
             exit 1
           fi
 
-          # Extract version number
+          # Extract version number (e.g., 3.22.1)
           ver=$(echo "$filename" | sed -E 's/protonmail-bridge_([0-9]+\.[0-9]+\.[0-9]+)-1_.*/\1/')
 
           if [ -z "$ver" ]; then
