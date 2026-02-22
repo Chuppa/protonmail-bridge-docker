@@ -22,21 +22,18 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y jq curl
 
-          # Get non-prerelease, non-draft tags and pick first matching v3.23+
-          ver=$(
+          resolved=$(
             curl -sSL https://api.github.com/repos/ProtonMail/proton-bridge/releases \
             | jq -r '.[] | select(.prerelease == false and .draft == false) | .tag_name' \
             | grep -E '^v3\.(2[3-9]|[3-9][0-9])\.' \
-            | head -n1 \
-            | sed 's/^v//'
+            | head -n1
           )
 
-          # Fallback if nothing matched
-          if [ -z "${ver:-}" ]; then
-            ver="3.23.0"
+          if [ -z "${resolved:-}" ]; then
+            resolved="v3.23.0"
           fi
 
-          echo "bridge_version=$ver" >> "$GITHUB_OUTPUT"
+          echo "bridge_version=${resolved#v}" >> "$GITHUB_OUTPUT"
 
       - name: Lowercase repo
         id: repo
